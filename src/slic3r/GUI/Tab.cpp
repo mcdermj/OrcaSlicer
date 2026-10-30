@@ -4852,6 +4852,15 @@ void TabFilament::build()
             on_value_change(opt_key, value);
         };
 
+        optgroup = page->new_optgroup(L("QIDI Box"));
+        optgroup->append_single_option_line("box_temperature");
+        optgroup->append_single_option_line("box_temperature_range_low");
+        optgroup->append_single_option_line("box_temperature_range_high");
+        optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+            update_dirty();
+            on_value_change(opt_key, value);
+        };
+
         optgroup = page->new_optgroup(L("Print temperature"), L"param_extruder_temp");
         line = { L("Nozzle"), L("Nozzle temperature when printing") };
         line.label_path = "material_temperatures#nozzle";
@@ -5274,6 +5283,10 @@ void TabFilament::toggle_options()
         toggle_line("activate_chamber_temp_control", printer_cfg.opt_bool("support_chamber_temp_control"), -1,
             _L("The selected printer does not support chamber temperature control."));
 
+        for (auto el : {"box_temperature", "box_temperature_range_low", "box_temperature_range_high"})
+            toggle_line(el, printer_cfg.opt_bool("support_box_temp_control"), -1,
+                _L("The selected printer does not support QIDI Box temperature control."));
+
         std::string volumetric_speed_cos = m_config->opt_string("volumetric_speed_coefficients", variant_index);
         bool enable_fit = volumetric_speed_cos != "0 0 0 0 0 0";
         toggle_option("filament_adaptive_volumetric_speed", enable_fit, 256 + variant_index,
@@ -5650,6 +5663,8 @@ void TabPrinter::build_fff()
         optgroup->append_single_option_line("auxiliary_fan", "printer_basic_information_accessory#auxiliary-part-cooling-fan");
         optgroup->append_single_option_line("fan_direction");
         optgroup->append_single_option_line("support_chamber_temp_control", "printer_basic_information_accessory#support-controlling-chamber-temperature");
+        optgroup->append_single_option_line("support_box_temp_control");
+        optgroup->append_single_option_line("box_slot_count");
         optgroup->append_single_option_line("support_air_filtration", "printer_basic_information_accessory#support-air-filtration");
         optgroup->append_single_option_line("cooling_filter_enabled");
 
@@ -6797,6 +6812,9 @@ void TabPrinter::toggle_options()
             _L("Select a shared collision volume mode or use a single-extruder printer to edit this setting."));
 
         toggle_line("fan_direction", m_config->opt_bool("auxiliary_fan"), -1, _L("Enable the auxiliary fan to edit its direction."));
+
+        toggle_line("box_slot_count", m_config->opt_bool("support_box_temp_control"), -1,
+            _L("Enable QIDI Box temperature control to use this setting."));
 
         // The cooling filter and air filtration are alternative accessories: show only the one the printer supports.
         toggle_line("support_air_filtration", !m_config->opt_bool("support_cooling_filter"), -1,
