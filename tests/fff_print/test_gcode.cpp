@@ -7,6 +7,7 @@
 #include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/Config.hpp"
 #include "libslic3r/calib.hpp"
+#include "libslic3r/GCode.hpp"
 #include "libslic3r/GCodeReader.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/ModelArrange.hpp"
@@ -525,4 +526,106 @@ TEST_CASE("The temperature tower steps the temperature of the tool printing it",
         CHECK(temperatures == std::set<int>{190, 195, 200, 205, 210, 215, 220, 225, 230});
         CHECK(tools == std::set<std::string>{multi_tool ? "1" : "none"});
     }
+}
+
+namespace {
+PrintConfig box_config(const std::vector<int>& temperature, const std::vector<int>& range_high, int slots = 4)
+{
+    PrintConfig config;
+    config.box_slot_count.value                 = slots;
+    config.box_temperature.values               = temperature;
+    config.box_temperature_range_low.values     = std::vector<int>(temperature.size(), 0);
+    config.box_temperature_range_high.values    = range_high;
+    return config;
+}
+} // namespace
+
+TEST_CASE("A printer without Box temperature control emits no Box commands", "[GCode][QidiBox]")
+{
+    const std::string gcode = Test::slice({Test::cube(20)}, {
+        {"support_box_temp_control", "0"},
+        {"box_temperature", "45"},
+        {"box_temperature_range_high", "45"},
+    });
+    CHECK(gcode.find("DISABLE_BOX_HEATER") == std::string::npos);
+    CHECK(gcode.find("BOX_TEMP_SET") == std::string::npos);
+}
+
+TEST_CASE("A Box printer sends the Box temperature before the start G-code", "[GCode][QidiBox]")
+{
+    const std::string gcode = Test::slice({Test::cube(20)}, {
+        {"support_box_temp_control", "1"},
+        {"box_temperature", "45"},
+        {"box_temperature_range_low", "0"},
+        {"box_temperature_range_high", "45"},
+        {"machine_start_gcode", "; START_MARKER"},
+    });
+    const size_t disable = gcode.find("DISABLE_BOX_HEATER");
+    const size_t set     = gcode.find("BOX_TEMP_SET VT0=45");
+    const size_t start   = gcode.find("; START_MARKER");
+    REQUIRE(disable != std::string::npos);
+    REQUIRE(set != std::string::npos);
+    REQUIRE(start != std::string::npos);
+    CHECK(disable < set);
+    CHECK(set < start);
+}
+
+TEST_CASE("A Box temperature of zero is sent as off", "[GCode][QidiBox]")
+{
+    const std::string block = GCode::generate_box_temp_command({0}, box_config({0}, {45}));
+    CHECK(block.find("VT0=0") != std::string::npos);
+}
+
+TEST_CASE("Filaments beyond the Box slots get no slot command", "[GCode][QidiBox]")
+{
+    const std::string block = GCode::generate_box_temp_command({0, 1, 2, 3, 4}, box_config({45, 45, 45, 45, 45}, {45, 45, 45, 45, 45}, 4));
+    for (const char* token : {"VT0=", "VT1=", "VT2=", "VT3="})
+        CHECK(block.find(token) != std::string::npos);
+    CHECK(block.find("VT4") == std::string::npos);
+    CHECK(block.find("filament 5 has no Box slot") != std::string::npos);
+}
+
+TEST_CASE("A Box temperature above the material cap is clamped", "[GCode][QidiBox]")
+{
+    const std::string block = GCode::generate_box_temp_command({0}, box_config({60}, {45}));
+    CHECK(block.find("VT0=45") != std::string::npos);
+    CHECK(block.find("clamped") != std::string::npos);
+}
+
+TEST_CASE("An inverted Box temperature range is capped by its high end", "[GCode][QidiBox]")
+{
+    PrintConfig config = box_config({30}, {45});
+    config.box_temperature_range_low.values = {50};
+    const std::string block = GCode::generate_box_temp_command({0}, config);
+    CHECK(block.find("VT0=45") != std::string::npos);
+}
+
+TEST_CASE("A material capped at zero is never heated", "[GCode][QidiBox]")
+{
+    const std::string block = GCode::generate_box_temp_command({0}, box_config({45}, {0}));
+    CHECK(block.find("VT0=0") != std::string::npos);
+}
+
+TEST_CASE("A printer with no Box slots only turns the heater off", "[GCode][QidiBox]")
+{
+    const std::string block = GCode::generate_box_temp_command({0, 1}, box_config({45, 45}, {45, 45}, 0));
+    CHECK(block.find("DISABLE_BOX_HEATER") != std::string::npos);
+    CHECK(block.find("BOX_TEMP_SET") == std::string::npos);
+}
+
+TEST_CASE("A sequential print sends the Box temperature of every object's filament", "[GCode][QidiBox]")
+{
+    DynamicPrintConfig config = Test::multifilament_config(2, {
+        {"print_sequence", "by object"},
+        {"enable_prime_tower", 0},
+        {"support_box_temp_control", "1"},
+        {"box_temperature", "45,0"},
+        {"box_temperature_range_low", "0,0"},
+        {"box_temperature_range_high", "45,45"},
+        {"skirt_loops", 0},
+        {"brim_type", "no_brim"},
+    });
+    const std::string gcode = Test::slice_with_object_overrides({Test::cube(20), Test::cube(20)}, config,
+                                                                {{{"extruder", "1"}}, {{"extruder", "2"}}});
+    CHECK(gcode.find("BOX_TEMP_SET VT0=45 VT1=0") != std::string::npos);
 }

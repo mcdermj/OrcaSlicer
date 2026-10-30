@@ -4402,6 +4402,9 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     // adds tag for processor
     file.write_format(";%s%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role).c_str(), ExtrusionEntity::role_to_string(erCustom).c_str());
 
+    if (print.config().support_box_temp_control.value)
+        file.write(generate_box_temp_command(m_writer.extruder_ids(), print.config()));
+
     // Orca: set chamber temperature at the beginning of gcode file
     if (activate_chamber_temp_control && max_chamber_temp > 0){
         int temp_out =0;
@@ -8394,6 +8397,31 @@ void GCode::append_full_config(const Print &print, std::string &str)
         }
     }
     str += ss.str();
+}
+
+std::string GCode::generate_box_temp_command(const std::vector<unsigned int>& filaments, const PrintConfig& config)
+{
+    std::string comments;
+    std::string temps;
+    for (const unsigned int n : filaments) {
+        if (static_cast<int>(n) >= config.box_slot_count.value) {
+            comments += format("; QIDI Box: filament %1% has no Box slot (box_slot_count = %2%), skipped\n", n + 1, config.box_slot_count.value);
+            continue;
+        }
+        const int requested = config.box_temperature.get_at(n);
+        const int low       = config.box_temperature_range_low.get_at(n);
+        const int high      = config.box_temperature_range_high.get_at(n);
+        const int emitted   = (requested == 0 || high == 0) ? 0 : std::min(std::max(requested, low), high);
+        if (emitted != requested)
+            comments += format("; QIDI Box: filament %1% box_temperature %2% clamped to %3% (range %4%-%5%)\n", n + 1, requested, emitted, low, high);
+        // Zero entries stay: the firmware heats each Box to its lowest VTn, so VT=0 protects a PLA spool.
+        temps += format(" VT%1%=%2%", n, emitted);
+    }
+
+    std::string block = "; QIDI_BOX_TEMP_BEGIN\n" + comments + "DISABLE_BOX_HEATER\n";
+    if (!temps.empty())
+        block += "BOX_TEMP_SET" + temps + "\n";
+    return block + "; QIDI_BOX_TEMP_END\n";
 }
 
 void GCode::set_extruders(const std::vector<unsigned int> &extruder_ids)

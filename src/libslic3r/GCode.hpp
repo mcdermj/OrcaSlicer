@@ -326,6 +326,9 @@ public:
     // append full config to the given string
     static void append_full_config(const Print& print, std::string& str);
 
+    // QIDI Box drying block for the given filament indices (ascending), one VTn per filament that has a Box slot.
+    static std::string generate_box_temp_command(const std::vector<unsigned int>& filaments, const PrintConfig& config);
+
     // Per-filament config-slot resolvers for the current layer (m_cur_layer_idx): the filament
     // resolver keys filament-indexed arrays, the nozzle resolver keys (extruder x volume-type)
     // slot arrays. Both degenerate to filament_id / extruder index on single-volume printers.
