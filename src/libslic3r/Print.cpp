@@ -387,6 +387,11 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         // Orca
         "chamber_temperature",
         "chamber_minimal_temperature",
+        "support_box_temp_control",
+        "box_slot_count",
+        "box_temperature",
+        "box_temperature_range_low",
+        "box_temperature_range_high",
         "thumbnails",
         "thumbnails_format",
         "center_of_surface_pattern",

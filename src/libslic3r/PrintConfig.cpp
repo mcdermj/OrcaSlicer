@@ -4618,6 +4618,21 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionBool(true));
     def->readonly=false;
 
+    def = this->add("support_box_temp_control", coBool);
+    def->label = L("Support QIDI Box temperature control");
+    def->tooltip = L("Enable this if the printer has a QIDI Box that can heat its spools during printing.\n"
+                     "G-code command: BOX_TEMP_SET");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("box_slot_count", coInt);
+    def->label = L("QIDI Box slots");
+    def->tooltip = L("Physical QIDI Box slots: 4 per Box. Filaments beyond this count get no Box temperature command.");
+    def->min = 0;
+    def->max = 16;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(4));
+
     def =this->add("support_air_filtration",coBool);
     def->label=L("Support air filtration");
     def->tooltip=L("Enable this if the printer supports air filtration\nG-code command: M106 P3 S(0-255)");
@@ -8042,6 +8057,36 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->max = max_temp;
     def->set_default_value(new ConfigOptionInts{0});
+
+    def = this->add("box_temperature", coInts);
+    def->label = L("Box temperature");
+    def->full_label = L("QIDI Box temperature");
+    def->tooltip = L("QIDI Box temperature during printing, 0 = off. One heater serves each Box, "
+                     "so the Box heats to the lowest temperature among the filaments it holds.");
+    def->sidetext = L(u8"℃" /* °C */);	// degrees Celsius, CIS languages need translation
+    def->min = 0;
+    def->max = 65;
+    def->mode = comSimple;
+    def->set_default_value(new ConfigOptionInts{0});
+
+    def = this->add("box_temperature_range_low", coInts);
+    def->label = L("Min");
+    def->full_label = L("Minimum QIDI Box temperature");
+    def->sidetext = L(u8"℃" /* °C */);	// degrees Celsius, CIS languages need translation
+    def->min = 0;
+    def->max = 65;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInts{0});
+
+    def = this->add("box_temperature_range_high", coInts);
+    def->label = L("Max");
+    def->full_label = L("Maximum QIDI Box temperature");
+    def->tooltip = L("0 means this material may not be heated in the QIDI Box.");
+    def->sidetext = L(u8"℃" /* °C */);	// degrees Celsius, CIS languages need translation
+    def->min = 0;
+    def->max = 65;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInts{35});
 
     def = this->add("chamber_minimal_temperature", coInts);
     def->label = L("Minimal");

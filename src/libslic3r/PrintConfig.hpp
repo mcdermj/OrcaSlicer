@@ -1858,6 +1858,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                cooling_filter_enabled))
     ((ConfigOptionEnum<PrinterStructure>,printer_structure))
     ((ConfigOptionBool,                support_chamber_temp_control))
+    ((ConfigOptionBool,                support_box_temp_control))
+    ((ConfigOptionInt,                 box_slot_count))
     ((ConfigOptionEnumsGeneric,        extruder_type))
     ((ConfigOptionEnumsGeneric,        nozzle_volume_type))
     ((ConfigOptionStrings,             extruder_ams_count))
@@ -2173,6 +2175,9 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionBools,               activate_chamber_temp_control))
     ((ConfigOptionInts ,               chamber_temperature))
     ((ConfigOptionInts ,               chamber_minimal_temperature))
+    ((ConfigOptionInts,                box_temperature))
+    ((ConfigOptionInts,                box_temperature_range_low))
+    ((ConfigOptionInts,                box_temperature_range_high))
 
     // Orca: support adaptive bed mesh
     ((ConfigOptionFloat,               preferred_orientation))
