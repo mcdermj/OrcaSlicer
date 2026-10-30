@@ -5007,6 +5007,13 @@ void TabFilament::build()
         line.append_option(optgroup->get_option("complete_print_exhaust_fan_speed"));
         line.label_path = "material_cooling#complete-print";
         optgroup->append_line(line);
+
+        optgroup = page->new_optgroup(L("QIDI Polar Cooler"));
+        optgroup->append_single_option_line("polar_cooler");
+        optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+            update_dirty();
+            on_value_change(opt_key, value);
+        };
         //BBS
         add_filament_overrides_page();
         const int gcode_field_height = 15; // 150
@@ -5192,6 +5199,9 @@ void TabFilament::toggle_options()
         // Orca: toggle dont slow down for external perimeters if
         bool has_slow_down_for_layer_cooling = m_config->opt_bool("slow_down_for_layer_cooling", 0);
         toggle_option("dont_slow_down_outer_wall", has_slow_down_for_layer_cooling, -1, _L("Enable slowing down for layer cooling to use this setting."));
+
+        toggle_line("polar_cooler", printer_cfg.opt_bool("is_support_polar_cooler"), -1,
+            _L("The selected printer does not have a QIDI Polar Cooler."));
 
         // ORCA: First layer fan speed override only makes sense when no layers are gated off ("No cooling for
         // the first" == 0). Otherwise the override would set layer 0 to a non-zero value while the gate forces
@@ -5666,6 +5676,7 @@ void TabPrinter::build_fff()
         optgroup->append_single_option_line("support_box_temp_control");
         optgroup->append_single_option_line("box_slot_count");
         optgroup->append_single_option_line("box_slot_map_in_gcode");
+        optgroup->append_single_option_line("is_support_polar_cooler");
         optgroup->append_single_option_line("support_air_filtration", "printer_basic_information_accessory#support-air-filtration");
         optgroup->append_single_option_line("cooling_filter_enabled");
 
