@@ -4633,6 +4633,13 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionInt(4));
 
+    def = this->add("box_slot_map_in_gcode", coBool);
+    def->label = L("Write QIDI Box slot map in G-code");
+    def->tooltip = L("Write a slot map into the G-code that assigns each used filament to the Box slot of the same number, "
+                     "so a print started from the printer applies it. Enable this only if the Box slots are loaded in filament order.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
     def =this->add("support_air_filtration",coBool);
     def->label=L("Support air filtration");
     def->tooltip=L("Enable this if the printer supports air filtration\nG-code command: M106 P3 S(0-255)");

@@ -148,6 +148,7 @@ using namespace std::literals::string_view_literals;
 #include "Format/STEP.hpp"
 #include "Model.hpp"
 #include "MultiNozzleUtils.hpp"
+#include "QidiBox.hpp"
 #include "Slicing.hpp"
 
 namespace fs = boost::filesystem;
@@ -4402,8 +4403,11 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     // adds tag for processor
     file.write_format(";%s%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role).c_str(), ExtrusionEntity::role_to_string(erCustom).c_str());
 
-    if (print.config().support_box_temp_control.value)
+    if (print.config().support_box_temp_control.value) {
+        if (print.config().box_slot_map_in_gcode.value)
+            file.write(QidiBox::build_slot_map_block(m_writer.extruder_ids(), print.config().box_slot_count.value));
         file.write(generate_box_temp_command(m_writer.extruder_ids(), print.config()));
+    }
 
     // Orca: set chamber temperature at the beginning of gcode file
     if (activate_chamber_temp_control && max_chamber_temp > 0){

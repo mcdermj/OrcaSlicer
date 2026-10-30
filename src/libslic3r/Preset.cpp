@@ -1607,7 +1607,7 @@ static std::vector<std::string> s_Preset_printer_options {
     "nozzle_height", "master_extruder_id",
     "default_print_profile", "inherits",
     "scan_first_layer", "enable_power_loss_recovery", "wrapping_detection_layers", "wrapping_exclude_area", "machine_load_filament_time", "machine_unload_filament_time", "machine_tool_change_time", "time_cost", "machine_pause_gcode", "template_custom_gcode",
-    "nozzle_type", "nozzle_hrc","auxiliary_fan", "fan_direction", "nozzle_volume","upward_compatible_machine", "z_hop_types", "travel_slope", "retract_lift_enforce","support_chamber_temp_control","support_box_temp_control","box_slot_count","support_air_filtration","support_cooling_filter","cooling_filter_enabled","printer_structure","farthest_point_timelapse",
+    "nozzle_type", "nozzle_hrc","auxiliary_fan", "fan_direction", "nozzle_volume","upward_compatible_machine", "z_hop_types", "travel_slope", "retract_lift_enforce","support_chamber_temp_control","support_box_temp_control","box_slot_count","box_slot_map_in_gcode","support_air_filtration","support_cooling_filter","cooling_filter_enabled","printer_structure","farthest_point_timelapse",
     "best_object_pos", "head_wrap_detect_zone",
     "host_type", "print_host", "printhost_apikey", "flashforge_serial_number", "bbl_use_printhost", "printer_agent",
     "print_host_webui",

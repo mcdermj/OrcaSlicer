@@ -389,6 +389,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "chamber_minimal_temperature",
         "support_box_temp_control",
         "box_slot_count",
+        "box_slot_map_in_gcode",
         "box_temperature",
         "box_temperature_range_low",
         "box_temperature_range_high",

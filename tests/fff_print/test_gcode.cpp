@@ -13,6 +13,7 @@
 #include "libslic3r/ModelArrange.hpp"
 #include "libslic3r/Print.hpp"
 #include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/QidiBox.hpp"
 #include "libslic3r/Preset.hpp"
 #include "libslic3r/PresetBundle.hpp"
 
@@ -628,4 +629,50 @@ TEST_CASE("A sequential print sends the Box temperature of every object's filame
     const std::string gcode = Test::slice_with_object_overrides({Test::cube(20), Test::cube(20)}, config,
                                                                 {{{"extruder", "1"}}, {{"extruder", "2"}}});
     CHECK(gcode.find("BOX_TEMP_SET VT0=45 VT1=0") != std::string::npos);
+}
+
+TEST_CASE("The Box slot map is left out unless the printer asks for it", "[GCode][QidiBox]")
+{
+    const std::string gcode = Test::slice({Test::cube(20)}, {
+        {"support_box_temp_control", "1"},
+        {"box_slot_map_in_gcode", "0"},
+    });
+    CHECK(gcode.find("SAVE_VARIABLE") == std::string::npos);
+    CHECK(gcode.find("QIDI_BOX_MAP_BEGIN") == std::string::npos);
+}
+
+TEST_CASE("The Box slot map names only the filaments the plate uses", "[GCode][QidiBox]")
+{
+    DynamicPrintConfig config = Test::multifilament_config(3, {
+        {"enable_prime_tower", 0},
+        {"support_box_temp_control", "1"},
+        {"box_slot_map_in_gcode", "1"},
+        {"box_temperature", "45,0,45"},
+        {"box_temperature_range_low", "0,0,0"},
+        {"box_temperature_range_high", "45,45,45"},
+    });
+    const std::string gcode = Test::slice_with_object_overrides({Test::cube(20), Test::cube(20)}, config,
+                                                                {{{"extruder", "1"}}, {{"extruder", "3"}}});
+    const size_t begin = gcode.find("; QIDI_BOX_MAP_BEGIN");
+    const size_t slot0 = gcode.find("SAVE_VARIABLE VARIABLE=value_t0 VALUE=\"'slot0'\"");
+    const size_t slot2 = gcode.find("SAVE_VARIABLE VARIABLE=value_t2 VALUE=\"'slot2'\"");
+    const size_t end   = gcode.find("; QIDI_BOX_MAP_END");
+    const size_t temp  = gcode.find("DISABLE_BOX_HEATER");
+    REQUIRE(begin != std::string::npos);
+    REQUIRE(slot0 != std::string::npos);
+    REQUIRE(slot2 != std::string::npos);
+    REQUIRE(end != std::string::npos);
+    REQUIRE(temp != std::string::npos);
+    CHECK(begin < slot0);
+    CHECK(slot0 < slot2);
+    CHECK(slot2 < end);
+    CHECK(end < temp);
+    CHECK(gcode.find("VARIABLE=value_t1") == std::string::npos);
+}
+
+TEST_CASE("Filaments beyond the Box slots stay out of the slot map", "[GCode][QidiBox]")
+{
+    const std::string block = QidiBox::build_slot_map_block({0, 1, 2, 3, 4}, 4);
+    CHECK(block.find("VARIABLE=value_t3 VALUE=\"'slot3'\"") != std::string::npos);
+    CHECK(block.find("value_t4") == std::string::npos);
 }

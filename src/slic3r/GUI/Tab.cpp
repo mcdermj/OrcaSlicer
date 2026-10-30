@@ -5665,6 +5665,7 @@ void TabPrinter::build_fff()
         optgroup->append_single_option_line("support_chamber_temp_control", "printer_basic_information_accessory#support-controlling-chamber-temperature");
         optgroup->append_single_option_line("support_box_temp_control");
         optgroup->append_single_option_line("box_slot_count");
+        optgroup->append_single_option_line("box_slot_map_in_gcode");
         optgroup->append_single_option_line("support_air_filtration", "printer_basic_information_accessory#support-air-filtration");
         optgroup->append_single_option_line("cooling_filter_enabled");
 
@@ -6813,8 +6814,9 @@ void TabPrinter::toggle_options()
 
         toggle_line("fan_direction", m_config->opt_bool("auxiliary_fan"), -1, _L("Enable the auxiliary fan to edit its direction."));
 
-        toggle_line("box_slot_count", m_config->opt_bool("support_box_temp_control"), -1,
-            _L("Enable QIDI Box temperature control to use this setting."));
+        for (auto el : {"box_slot_count", "box_slot_map_in_gcode"})
+            toggle_line(el, m_config->opt_bool("support_box_temp_control"), -1,
+                _L("Enable QIDI Box temperature control to use this setting."));
 
         // The cooling filter and air filtration are alternative accessories: show only the one the printer supports.
         toggle_line("support_air_filtration", !m_config->opt_bool("support_cooling_filter"), -1,

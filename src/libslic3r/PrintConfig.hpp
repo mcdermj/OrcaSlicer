@@ -1860,6 +1860,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                support_chamber_temp_control))
     ((ConfigOptionBool,                support_box_temp_control))
     ((ConfigOptionInt,                 box_slot_count))
+    ((ConfigOptionBool,                box_slot_map_in_gcode))
     ((ConfigOptionEnumsGeneric,        extruder_type))
     ((ConfigOptionEnumsGeneric,        nozzle_volume_type))
     ((ConfigOptionStrings,             extruder_ams_count))
