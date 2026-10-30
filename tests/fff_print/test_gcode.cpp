@@ -686,3 +686,69 @@ TEST_CASE("A filament without a Box slot keeps the slot map from enabling the Bo
     CHECK(block.find("VARIABLE=value_t0") != std::string::npos);
     CHECK(block.find("enable_box") == std::string::npos);
 }
+
+namespace {
+PrintConfig polar_cooler_config(const std::vector<PolarCoolerMode>& modes)
+{
+    PrintConfig config;
+    config.polar_cooler.values.clear();
+    for (const PolarCoolerMode mode : modes)
+        config.polar_cooler.values.push_back(static_cast<int>(mode));
+    return config;
+}
+} // namespace
+
+TEST_CASE("A printer without the Polar Cooler gets no cooler setting", "[GCode][QidiPolarCooler]")
+{
+    const std::string gcode = Test::slice({Test::cube(20)}, {
+        {"is_support_polar_cooler", "0"},
+        {"polar_cooler", "on"},
+    });
+    CHECK(gcode.find("enable_polar_cooler") == std::string::npos);
+}
+
+TEST_CASE("Filaments that leave the cooler to the printer write nothing", "[GCode][QidiPolarCooler]")
+{
+    const std::string gcode = Test::slice({Test::cube(20)}, {
+        {"is_support_polar_cooler", "1"},
+        {"polar_cooler", "printer"},
+    });
+    CHECK(gcode.find("enable_polar_cooler") == std::string::npos);
+}
+
+TEST_CASE("A filament that wants the cooler turns it on before the start G-code", "[GCode][QidiPolarCooler]")
+{
+    const std::string gcode = Test::slice({Test::cube(20)}, {
+        {"is_support_polar_cooler", "1"},
+        {"polar_cooler", "on"},
+        {"machine_start_gcode", "; START_MARKER"},
+    });
+    const size_t set   = gcode.find("SAVE_VARIABLE VARIABLE=enable_polar_cooler VALUE=1");
+    const size_t start = gcode.find("; START_MARKER");
+    REQUIRE(set != std::string::npos);
+    REQUIRE(start != std::string::npos);
+    CHECK(set < start);
+}
+
+TEST_CASE("A filament that must not be cooled turns the cooler off", "[GCode][QidiPolarCooler]")
+{
+    const std::string gcode = Test::slice({Test::cube(20)}, {
+        {"is_support_polar_cooler", "1"},
+        {"polar_cooler", "off"},
+    });
+    CHECK(gcode.find("SAVE_VARIABLE VARIABLE=enable_polar_cooler VALUE=0") != std::string::npos);
+}
+
+TEST_CASE("Off outranks on for the Polar Cooler", "[GCode][QidiPolarCooler]")
+{
+    const std::string command = GCode::generate_polar_cooler_command(
+        {0, 1}, polar_cooler_config({PolarCoolerMode::On, PolarCoolerMode::Off}));
+    CHECK(command.find("VALUE=0") != std::string::npos);
+}
+
+TEST_CASE("On with the rest left to the printer turns the cooler on", "[GCode][QidiPolarCooler]")
+{
+    const std::string command = GCode::generate_polar_cooler_command(
+        {0, 1}, polar_cooler_config({PolarCoolerMode::On, PolarCoolerMode::Printer}));
+    CHECK(command.find("VALUE=1") != std::string::npos);
+}

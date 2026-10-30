@@ -4409,6 +4409,10 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
         file.write(generate_box_temp_command(m_writer.extruder_ids(), print.config()));
     }
 
+    // The start G-code's M1004 reads enable_polar_cooler, so this must come before it.
+    if (print.config().is_support_polar_cooler.value)
+        file.write(generate_polar_cooler_command(m_writer.extruder_ids(), print.config()));
+
     // Orca: set chamber temperature at the beginning of gcode file
     if (activate_chamber_temp_control && max_chamber_temp > 0){
         int temp_out =0;
@@ -8426,6 +8430,18 @@ std::string GCode::generate_box_temp_command(const std::vector<unsigned int>& fi
     if (!temps.empty())
         block += "BOX_TEMP_SET" + temps + "\n";
     return block + "; QIDI_BOX_TEMP_END\n";
+}
+
+std::string GCode::generate_polar_cooler_command(const std::vector<unsigned int>& filaments, const PrintConfig& config)
+{
+    bool any_on = false;
+    for (const unsigned int n : filaments) {
+        const auto mode = static_cast<PolarCoolerMode>(config.polar_cooler.get_at(n));
+        if (mode == PolarCoolerMode::Off)
+            return "SAVE_VARIABLE VARIABLE=enable_polar_cooler VALUE=0\n";
+        any_on |= mode == PolarCoolerMode::On;
+    }
+    return any_on ? "SAVE_VARIABLE VARIABLE=enable_polar_cooler VALUE=1\n" : std::string();
 }
 
 void GCode::set_extruders(const std::vector<unsigned int> &extruder_ids)
