@@ -602,6 +602,13 @@ static const t_config_enum_values s_keys_map_OverhangFanThreshold = {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(OverhangFanThreshold)
 
+static const t_config_enum_values s_keys_map_PolarCoolerMode = {
+    { "printer",    int(PolarCoolerMode::Printer) },
+    { "on",         int(PolarCoolerMode::On)      },
+    { "off",        int(PolarCoolerMode::Off)     }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(PolarCoolerMode)
+
 // BBS
 static const t_config_enum_values s_keys_map_BedType = {
     { "Default Plate",      btDefault },
@@ -4640,6 +4647,13 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
 
+    def = this->add("is_support_polar_cooler", coBool);
+    def->label = L("Support QIDI Polar Cooler");
+    def->tooltip = L("Enable this if the printer has a QIDI Polar Cooler that can cool the chamber during printing.\n"
+                     "G-code command: SAVE_VARIABLE VARIABLE=enable_polar_cooler");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
     def =this->add("support_air_filtration",coBool);
     def->label=L("Support air filtration");
     def->tooltip=L("Enable this if the printer supports air filtration\nG-code command: M106 P3 S(0-255)");
@@ -8094,6 +8108,20 @@ void PrintConfigDef::init_fff_params()
     def->max = 65;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionInts{35});
+
+    def = this->add("polar_cooler", coEnums);
+    def->label = L("QIDI Polar Cooler");
+    def->tooltip = L("Whether the QIDI Polar Cooler runs while printing this filament. \"Printer setting\" leaves the printer's own choice alone. "
+                     "One cooler serves the whole chamber, so if any filament is set to Off the cooler stays off.");
+    def->enum_keys_map = &ConfigOptionEnum<PolarCoolerMode>::get_enum_values();
+    def->mode = comSimple;
+    def->enum_values.emplace_back("printer");
+    def->enum_values.emplace_back("on");
+    def->enum_values.emplace_back("off");
+    def->enum_labels.emplace_back(L("Printer setting"));
+    def->enum_labels.emplace_back(L("On"));
+    def->enum_labels.emplace_back(L("Off"));
+    def->set_default_value(new ConfigOptionEnumsGeneric{ int(PolarCoolerMode::Printer) });
 
     def = this->add("chamber_minimal_temperature", coInts);
     def->label = L("Minimal");

@@ -504,6 +504,12 @@ enum OverhangFanThreshold {
     Overhang_threshold_bridge
 };
 
+enum class PolarCoolerMode {
+    Printer,
+    On,
+    Off
+};
+
 // BBS
 enum BedType {
     btDefault = 0,
@@ -835,6 +841,7 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(ArcFittingMode)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SurfaceFillOrder)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(AdaptiveInfillMode)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(AdaptiveInfillGradient)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(PolarCoolerMode)
 
 #undef CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS
 
@@ -1861,6 +1868,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                support_box_temp_control))
     ((ConfigOptionInt,                 box_slot_count))
     ((ConfigOptionBool,                box_slot_map_in_gcode))
+    ((ConfigOptionBool,                is_support_polar_cooler))
     ((ConfigOptionEnumsGeneric,        extruder_type))
     ((ConfigOptionEnumsGeneric,        nozzle_volume_type))
     ((ConfigOptionStrings,             extruder_ams_count))
@@ -2179,6 +2187,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionInts,                box_temperature))
     ((ConfigOptionInts,                box_temperature_range_low))
     ((ConfigOptionInts,                box_temperature_range_high))
+    ((ConfigOptionEnumsGeneric,        polar_cooler))
 
     // Orca: support adaptive bed mesh
     ((ConfigOptionFloat,               preferred_orientation))

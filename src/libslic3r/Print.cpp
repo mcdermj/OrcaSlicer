@@ -393,6 +393,8 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "box_temperature",
         "box_temperature_range_low",
         "box_temperature_range_high",
+        "is_support_polar_cooler",
+        "polar_cooler",
         "thumbnails",
         "thumbnails_format",
         "center_of_surface_pattern",
