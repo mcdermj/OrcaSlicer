@@ -653,17 +653,20 @@ TEST_CASE("The Box slot map names only the filaments the plate uses", "[GCode][Q
     });
     const std::string gcode = Test::slice_with_object_overrides({Test::cube(20), Test::cube(20)}, config,
                                                                 {{{"extruder", "1"}}, {{"extruder", "3"}}});
-    const size_t begin = gcode.find("; QIDI_BOX_MAP_BEGIN");
-    const size_t slot0 = gcode.find("SAVE_VARIABLE VARIABLE=value_t0 VALUE=\"'slot0'\"");
+    const size_t begin  = gcode.find("; QIDI_BOX_MAP_BEGIN");
+    const size_t enable = gcode.find("SAVE_VARIABLE VARIABLE=enable_box VALUE=1");
+    const size_t slot0  = gcode.find("SAVE_VARIABLE VARIABLE=value_t0 VALUE=\"'slot0'\"");
     const size_t slot2 = gcode.find("SAVE_VARIABLE VARIABLE=value_t2 VALUE=\"'slot2'\"");
     const size_t end   = gcode.find("; QIDI_BOX_MAP_END");
     const size_t temp  = gcode.find("DISABLE_BOX_HEATER");
     REQUIRE(begin != std::string::npos);
+    REQUIRE(enable != std::string::npos);
     REQUIRE(slot0 != std::string::npos);
     REQUIRE(slot2 != std::string::npos);
     REQUIRE(end != std::string::npos);
     REQUIRE(temp != std::string::npos);
-    CHECK(begin < slot0);
+    CHECK(begin < enable);
+    CHECK(enable < slot0);
     CHECK(slot0 < slot2);
     CHECK(slot2 < end);
     CHECK(end < temp);
@@ -675,4 +678,11 @@ TEST_CASE("Filaments beyond the Box slots stay out of the slot map", "[GCode][Qi
     const std::string block = QidiBox::build_slot_map_block({0, 1, 2, 3, 4}, 4);
     CHECK(block.find("VARIABLE=value_t3 VALUE=\"'slot3'\"") != std::string::npos);
     CHECK(block.find("value_t4") == std::string::npos);
+}
+
+TEST_CASE("A filament without a Box slot keeps the slot map from enabling the Box", "[GCode][QidiBox]")
+{
+    const std::string block = QidiBox::build_slot_map_block({0, 4}, 4);
+    CHECK(block.find("VARIABLE=value_t0") != std::string::npos);
+    CHECK(block.find("enable_box") == std::string::npos);
 }

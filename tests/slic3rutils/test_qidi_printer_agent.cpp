@@ -113,6 +113,26 @@ TEST_CASE("Filaments past the firmware's last tool variable are skipped", "[Qidi
     CHECK(QidiPrinterAgent::build_tool_slot_script(mapping) == "SAVE_VARIABLE VARIABLE=value_t15 VALUE=\"'slot1'\"");
 }
 
+TEST_CASE("A mapping entirely in the Box enables the Box", "[QidiPrinterAgent]")
+{
+    const std::string script = QidiPrinterAgent::build_tool_slot_script("[0, 1]");
+    CHECK(script.rfind("SAVE_VARIABLE VARIABLE=enable_box VALUE=1\n", 0) == 0);
+    CHECK(script.find("VARIABLE=value_t1") != std::string::npos);
+}
+
+TEST_CASE("A used filament without a Box slot leaves the Box setting alone", "[QidiPrinterAgent]")
+{
+    const std::string script = QidiPrinterAgent::build_tool_slot_script("[0, -1]", R"([{"filamentType":"PLA"},{"filamentType":"TPU"}])");
+    CHECK(script.find("VARIABLE=value_t0") != std::string::npos);
+    CHECK(script.find("enable_box") == std::string::npos);
+}
+
+TEST_CASE("An unused filament does not keep the Box from being enabled", "[QidiPrinterAgent]")
+{
+    const std::string script = QidiPrinterAgent::build_tool_slot_script("[0, -1]", R"([{"filamentType":"PLA"},{"filamentType":""}])");
+    CHECK(script.find("VARIABLE=enable_box") != std::string::npos);
+}
+
 TEST_CASE("The print start of a 3MF names the plate to print", "[QidiPrinterAgent]")
 {
     PrintParams params;

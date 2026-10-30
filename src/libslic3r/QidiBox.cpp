@@ -1,5 +1,6 @@
 #include "QidiBox.hpp"
 
+#include <algorithm>
 #include <charconv>
 #include <cstddef>
 #include <optional>
@@ -60,9 +61,31 @@ std::string format_slot_line(int filament, int slot)
     return "SAVE_VARIABLE VARIABLE=value_t" + std::to_string(filament) + " VALUE=\"'slot" + std::to_string(slot) + "'\"";
 }
 
+std::string format_enable_line()
+{
+    return "SAVE_VARIABLE VARIABLE=enable_box VALUE=1";
+}
+
+bool maps_every_filament(const std::vector<int>& slots, int slot_limit)
+{
+    return !slots.empty() && std::all_of(slots.begin(), slots.end(), [slot_limit](int slot) { return slot >= 0 && slot < slot_limit; });
+}
+
+std::vector<int> used_slots(const std::vector<int>& mapping, const std::vector<std::string>& filament_types)
+{
+    std::vector<int> slots;
+    for (size_t filament = 0; filament < mapping.size(); ++filament)
+        if (filament_types.empty() || (filament < filament_types.size() && !filament_types[filament].empty()))
+            slots.push_back(mapping[filament]);
+    return slots;
+}
+
 std::string build_slot_map_block(const std::vector<unsigned int>& filaments, int slot_count)
 {
     std::string block = "; QIDI_BOX_MAP_BEGIN\n";
+    const std::vector<int> slots(filaments.begin(), filaments.end());
+    if (maps_every_filament(slots, slot_count))
+        block += format_enable_line() + "\n";
     for (const unsigned int n : filaments)
         if (static_cast<int>(n) < slot_count)
             block += format_slot_line(static_cast<int>(n), static_cast<int>(n)) + "\n";

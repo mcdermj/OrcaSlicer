@@ -153,22 +153,19 @@ bool QidiPrinterAgent::fetch_filament_info(std::string dev_id, FilamentSyncMode 
     return true;
 }
 
-std::string QidiPrinterAgent::build_tool_slot_script(const std::string& ams_mapping)
+std::string QidiPrinterAgent::build_tool_slot_script(const std::string& ams_mapping, const std::string& ams_mapping_info)
 {
     // The firmware has value_t0 to value_t15 and slots 0 to 15
     constexpr int slot_count = 16;
 
     // One entry per filament: its Box slot index, negative when no slot was chosen
-    const auto  mapping = nlohmann::json::parse(ams_mapping, nullptr, false);
-    std::string script;
-    if (!mapping.is_array()) {
+    std::vector<int> mapping;
+    std::string      script;
+    if (!QidiBox::parse_slot_mapping(ams_mapping, mapping)) {
         return script;
     }
     for (int filament = 0; filament < int(mapping.size()) && filament < slot_count; ++filament) {
-        if (!mapping[filament].is_number_integer()) {
-            continue;
-        }
-        const int slot = mapping[filament].get<int>();
+        const int slot = mapping[filament];
         if (slot < 0 || slot >= slot_count) {
             continue;
         }
@@ -176,6 +173,17 @@ std::string QidiPrinterAgent::build_tool_slot_script(const std::string& ams_mapp
             script += '\n';
         }
         script += QidiBox::format_slot_line(filament, slot);
+    }
+    if (script.empty()) {
+        return script;
+    }
+
+    std::vector<std::string> filament_types;
+    QidiBox::parse_filament_types(ams_mapping_info, filament_types);
+    if (QidiBox::maps_every_filament(QidiBox::used_slots(mapping, filament_types), slot_count)) {
+        script = QidiBox::format_enable_line() + '\n' + script;
+    } else {
+        BOOST_LOG_TRIVIAL(warning) << "QidiPrinterAgent::build_tool_slot_script: A used filament has no Box slot, leaving enable_box as it is";
     }
     return script;
 }
@@ -284,7 +292,7 @@ bool QidiPrinterAgent::query_box_state(QidiBox::BoxState& state, std::string& er
 
 bool QidiPrinterAgent::print_uploaded_file(const PrintParams& params, const std::string& filename)
 {
-    const std::string script = build_tool_slot_script(params.ams_mapping);
+    const std::string script = build_tool_slot_script(params.ams_mapping, params.ams_mapping_info);
     if (!script.empty() && !send_gcode_sync(device_info.dev_id, script)) {
         return false;
     }

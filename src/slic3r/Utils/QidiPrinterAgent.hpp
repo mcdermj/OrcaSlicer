@@ -26,8 +26,9 @@ public:
     // Override filament sync (Qidi-specific implementation)
     bool fetch_filament_info(std::string dev_id, FilamentSyncMode sync_mode = FilamentSyncMode::pull) override;
 
-    // Builds the SAVE_VARIABLE lines that make each T<n> macro load the Box slot picked for filament n
-    static std::string build_tool_slot_script(const std::string& ams_mapping);
+    // Builds the SAVE_VARIABLE lines that make each T<n> macro load the Box slot picked for filament n, led by enable_box when
+    // every used filament has a slot. `ams_mapping_info` tells used filaments from unused ones; without it all are used.
+    static std::string build_tool_slot_script(const std::string& ams_mapping, const std::string& ams_mapping_info = {});
     // Builds the body of Moonraker's print start for an uploaded file, naming the plate to print when it is a 3MF
     static nlohmann::json print_start_request(const PrintParams& params, const std::string& filename);
 

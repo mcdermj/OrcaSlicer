@@ -41,6 +41,21 @@ TEST_CASE("The blocks at the head of the G-code name their slots and temperature
     CHECK(blocks.temp_filaments == std::vector<int>{0, 3});
 }
 
+TEST_CASE("The enable_box line in a map block is not a disagreement with the dialog", "[QidiBox]")
+{
+    const QidiBox::Blocks blocks = QidiBox::parse_blocks(QidiBox::build_slot_map_block({0, 1}, 4));
+
+    REQUIRE(blocks.has_map);
+    CHECK(blocks.map_slots == std::vector<std::pair<int, int>>{{0, 0}, {1, 1}});
+    CHECK_FALSE(QidiBox::find_map_conflict(blocks, {0, 1}));
+}
+
+TEST_CASE("Only filaments with a type count as used", "[QidiBox]")
+{
+    CHECK(QidiBox::used_slots({0, -1, 2}, {"PLA", "", "PETG"}) == std::vector<int>{0, 2});
+    CHECK(QidiBox::used_slots({0, -1}, {}) == std::vector<int>{0, -1});
+}
+
 TEST_CASE("G-code without the blocks parses as having none", "[QidiBox]")
 {
     // A start G-code may quote a marker mid-line

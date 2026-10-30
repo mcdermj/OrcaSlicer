@@ -9,8 +9,17 @@ namespace Slic3r { namespace QidiBox {
 
 std::string format_slot_line(int filament, int slot);
 
+std::string format_enable_line();
+
+// True when `slots` is not empty and every entry is a slot below `slot_limit`.
+bool maps_every_filament(const std::vector<int>& slots, int slot_limit);
+
+// The slots of the filaments the plate uses. The dialog maps an unused filament to -1 just as it does an external spool, so
+// they can only be told apart by their type in `filament_types`; no `filament_types` means every filament is used.
+std::vector<int> used_slots(const std::vector<int>& mapping, const std::vector<std::string>& filament_types);
+
 // Identity map (filament n to slot n) of the filaments that have a slot, between the
-// QIDI_BOX_MAP markers.
+// QIDI_BOX_MAP markers. Starts with the enable_box line when every filament has a slot.
 std::string build_slot_map_block(const std::vector<unsigned int>& filaments, int slot_count);
 
 // Reads one line written by format_slot_line(). Returns false for any other line.
