@@ -420,6 +420,7 @@ void PrintJob::process(Ctl &ctl)
 
     wxString error_text;
     std::string msg_text;
+    std::string refusal_text;
 
 
     const int StagePercentPoint[(int)PrintingStageFinished + 1] = {
@@ -438,6 +439,7 @@ void PrintJob::process(Ctl &ctl)
     auto update_fn = [this, &ctl,
         &is_try_lan_mode,
         &is_try_lan_mode_failed,
+        &refusal_text,
         &msg,
         &curr_percent,
         StagePercentPoint
@@ -509,6 +511,9 @@ void PrintJob::process(Ctl &ctl)
                                 m_plater->update_print_error_info(code, desc_fail_not_exist, info);
                             }else if (code == BAMBU_NETWORK_ERR_PRINT_LP_UPLOAD_FTP_FAILED || code == BAMBU_NETWORK_ERR_PRINT_SG_UPLOAD_FTP_FAILED) {
                                 m_plater->update_print_error_info(code, desc_upload_ftp_failed, info);
+                            }else if (code == BAMBU_NETWORK_ERR_PRINT_LP_REFUSED) {
+                                refusal_text = info;
+                                m_plater->update_print_error_info(code, info, "");
                             }else {
                                 m_plater->update_print_error_info(code, desc_network_error, info);
                             }
@@ -701,6 +706,8 @@ void PrintJob::process(Ctl &ctl)
             msg_text = timeout_to_upload_str;
         } else if (result == BAMBU_NETWORK_ERR_PRINT_LP_UPLOAD_FTP_FAILED || result == BAMBU_NETWORK_ERR_PRINT_SG_UPLOAD_FTP_FAILED) {
             msg_text = upload_ftp_failed_str;
+        } else if (result == BAMBU_NETWORK_ERR_PRINT_LP_REFUSED && !refusal_text.empty()) {
+            msg_text = refusal_text;
         } else if (result == BAMBU_NETWORK_ERR_CANCELED) {
             msg_text = print_canceled_str;
             ctl.update_status(0, msg_text);

@@ -88,6 +88,8 @@ namespace Slic3r {
 #define BAMBU_NETWORK_ERR_PRINT_LP_FILE_OVER_SIZE                   -4010 //the size of the uploaded file cannot exceed 1 GB
 #define BAMBU_NETWORK_ERR_PRINT_LP_UPLOAD_FTP_FAILED                -4020 //failed to upload ftp
 #define BAMBU_NETWORK_ERR_PRINT_LP_PUBLISH_MSG_FAILED               -4030 //failed to send mqtt message to  device
+// Orca: not a Bambu plugin code; kept clear of its -40x0 range so a newer plugin header cannot collide with it
+#define BAMBU_NETWORK_ERR_PRINT_LP_REFUSED                          -4900 //a printer agent refused the send before upload
 
 //start_send_gcode_to_sdcard error
 #define BAMBU_NETWORK_ERR_PRINT_SG_UPLOAD_FTP_FAILED                -5010 //failed to upload ftp

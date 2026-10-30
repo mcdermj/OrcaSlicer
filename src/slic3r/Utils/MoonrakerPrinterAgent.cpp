@@ -503,6 +503,13 @@ int MoonrakerPrinterAgent::start_local_print(PrintParams params, OnUpdateStatusF
 
     const std::string upload_filename = file.upload_name(params.project_name);
 
+    std::string error;
+    if (!check_upload(params, file.path(), error)) {
+        if (update_fn)
+            update_fn(PrintingStageERROR, BAMBU_NETWORK_ERR_PRINT_LP_REFUSED, error);
+        return BAMBU_NETWORK_ERR_PRINT_LP_REFUSED;
+    }
+
     // Upload file
     if (update_fn)
         update_fn(PrintingStageUpload, 0, _u8L("Uploading G-code..."));
@@ -524,6 +531,16 @@ int MoonrakerPrinterAgent::start_local_print(PrintParams params, OnUpdateStatusF
     if (update_fn)
         update_fn(PrintingStageFinished, 100, _u8L("Print started"));
     return BAMBU_NETWORK_SUCCESS;
+}
+
+bool MoonrakerPrinterAgent::extract_bundle_plate_gcode(const std::string& archive_path, int plate_index, const boost::filesystem::path& gcode_path)
+{
+    return extract_plate_gcode(archive_path, plate_index, gcode_path);
+}
+
+bool MoonrakerPrinterAgent::check_upload(const PrintParams& /*params*/, const std::string& /*gcode_path*/, std::string& /*error*/)
+{
+    return true;
 }
 
 bool MoonrakerPrinterAgent::print_uploaded_file(const PrintParams& /*params*/, const std::string& filename)

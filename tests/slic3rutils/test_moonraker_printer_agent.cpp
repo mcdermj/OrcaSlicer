@@ -574,10 +574,19 @@ class UploadAgent : public MoonrakerPrinterAgent
 public:
     explicit UploadAgent(const FakePrinter& printer) : MoonrakerPrinterAgent("") { device_info.base_url = printer.base_url(); }
     std::string printed;
+    std::string checked;
+    std::string refusal;
     bool        takes_3mf = false;
 
 protected:
     bool accepts_3mf() const override { return takes_3mf; }
+
+    bool check_upload(const PrintParams&, const std::string& gcode_path, std::string& error) override
+    {
+        checked = gcode_path;
+        error   = refusal;
+        return refusal.empty();
+    }
 
     bool print_uploaded_file(const PrintParams& params, const std::string& filename) override
     {
@@ -985,6 +994,33 @@ TEST_CASE("A .gcode.3mf goes to the printer as the printed plate's G-code unless
     // Neither the source folder nor the temp folder keeps an extracted copy
     CHECK(std::distance(boost::filesystem::directory_iterator(dir.path()), boost::filesystem::directory_iterator()) == 1);
     CHECK(boost::filesystem::is_empty(temp.path()));
+}
+
+TEST_CASE("A refused upload check stops the send before anything is uploaded", "[MoonrakerPrinterAgent][Upload]")
+{
+    ScopedTemporaryDir dir("moonraker-upload");
+    const std::string gcode = (dir.path() / "Cube.gcode").string();
+    {
+        boost::filesystem::ofstream out(gcode);
+        out << "; plain G-code\n";
+    }
+
+    FakePrinter printer(Behavior::AnswersPings);
+    UploadAgent agent(printer);
+    agent.refusal = "Slot 2 is empty";
+    PrintParams params{};
+    params.filename = gcode;
+
+    std::string reported;
+    const auto  update = [&reported](int stage, int, std::string info) {
+        if (stage == PrintingStageERROR)
+            reported = info;
+    };
+    CHECK(agent.start_local_print(params, update, nullptr) == BAMBU_NETWORK_ERR_PRINT_LP_REFUSED);
+    CHECK(agent.checked == gcode);
+    CHECK(reported == "Slot 2 is empty");
+    CHECK(printer.upload().empty());
+    CHECK(agent.printed.empty());
 }
 
 TEST_CASE("A bundle without the printed plate's G-code is uploaded only when it holds a single plate", "[MoonrakerPrinterAgent][Upload]")

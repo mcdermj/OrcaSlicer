@@ -14,6 +14,7 @@
 #include <string>
 #include <thread>
 
+#include <boost/filesystem/path.hpp>
 #include <nlohmann/json.hpp>
 #include <vector>
 
@@ -133,6 +134,11 @@ protected:
                                    const std::function<bool()>& cancelled) const;
     // Starts the print of a file already uploaded to the gcodes root
     virtual bool print_uploaded_file(const PrintParams& params, const std::string& filename);
+    // Called by start_local_print() before the upload, with the file about to be uploaded. Returning false stops the
+    // send and shows `error`. The file must not be modified.
+    virtual bool check_upload(const PrintParams& params, const std::string& gcode_path, std::string& error);
+    // Writes the G-code of plate_index (or of the only plate) out of a .gcode.3mf bundle
+    static bool extract_bundle_plate_gcode(const std::string& archive_path, int plate_index, const boost::filesystem::path& gcode_path);
     // Whether the printer prints a .gcode.3mf bundle as is (its use_3mf option)
     virtual bool accepts_3mf() const;
     void start_status_stream(const std::string& dev_id, const std::string& base_url, const std::string& api_key);
