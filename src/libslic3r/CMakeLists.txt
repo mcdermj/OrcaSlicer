@@ -439,6 +439,8 @@ set(lisbslic3r_sources
     PrintRegion.cpp
     ProjectTask.cpp
     ProjectTask.hpp
+    QidiBox.cpp
+    QidiBox.hpp
     QuadricEdgeCollapse.cpp
     QuadricEdgeCollapse.hpp
     Semver.cpp

@@ -4,6 +4,7 @@
 #include "IPrinterAgent.hpp"
 #include "bambu_networking.hpp"
 #include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/QidiBox.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
 
 #include "nlohmann/json.hpp"
@@ -115,8 +116,7 @@ std::string QidiPrinterAgent::build_tool_slot_script(const std::string& ams_mapp
         if (!script.empty()) {
             script += '\n';
         }
-        // SAVE_VARIABLE reads VALUE as a Python literal, so the slot name keeps its own quotes
-        script += "SAVE_VARIABLE VARIABLE=value_t" + std::to_string(filament) + " VALUE=\"'slot" + std::to_string(slot) + "'\"";
+        script += QidiBox::format_slot_line(filament, slot);
     }
     return script;
 }

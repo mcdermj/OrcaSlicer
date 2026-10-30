@@ -74,6 +74,7 @@ add_executable(${_TEST_NAME}_tests
     test_miniz_extension.cpp
     test_timeutils.cpp
     test_semver.cpp
+    test_qidi_box.cpp
     test_voronoi.cpp
     test_wipe_tower_estimate.cpp
     test_wipe_tower.cpp
