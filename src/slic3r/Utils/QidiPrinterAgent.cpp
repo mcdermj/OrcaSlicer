@@ -79,6 +79,12 @@ std::string describe(const QidiBox::Problem& problem, int slot_limit)
         return format(_u8L("Filament %1% is mapped to Box slot %2%, beyond the printer's last Box slot (%3%). "
                            "Pick other slots in the print dialog, or set box_slot_count to match the printer."),
                       filament, slot, slot_limit);
+    case QidiBox::Problem::Kind::SlotEmpty:
+        return format(_u8L("Box slot %2% is empty, but filament %1% is mapped to it. Load the filament or pick another slot in the print dialog."),
+                      filament, slot);
+    case QidiBox::Problem::Kind::TypeMismatch:
+        return format(_u8L("Filament %1% is %3%, but Box slot %2% now holds %4%. Pick another slot in the print dialog."), filament, slot,
+                      problem.filament_type, problem.slot_type);
     case QidiBox::Problem::Kind::TempBeyondBoxes:
         return format(_u8L("The G-code sets a Box temperature for filament %1%, beyond the printer's last Box slot (%2%). "
                            "Set box_slot_count to match the printer and slice again."),
@@ -216,6 +222,9 @@ bool QidiPrinterAgent::check_upload(const PrintParams& params, const std::string
 
     std::vector<std::string> filament_types;
     QidiBox::parse_filament_types(params.ams_mapping_info, filament_types);
+    for (std::string& type : filament_types) {
+        type = normalize_filament_type(type);
+    }
     if (const auto problem = QidiBox::find_state_problem(blocks, mapping, filament_types, state)) {
         error = describe(*problem, state.box_count * 4);
         return false;
@@ -241,6 +250,11 @@ bool QidiPrinterAgent::query_box_state(QidiBox::BoxState& state, std::string& er
     } catch (const nlohmann::json::exception& e) {
         error = e.what();
         return false;
+    }
+
+    state.slots.clear();
+    for (const AmsTrayData& tray : trays) {
+        state.slots.push_back({tray.has_filament, tray.tray_type});
     }
 
     std::string body;

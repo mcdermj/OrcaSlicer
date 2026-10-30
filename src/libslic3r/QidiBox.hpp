@@ -27,21 +27,32 @@ struct Blocks
 
 Blocks parse_blocks(const std::string& gcode);
 
-// What the printer reported at send time.
+// What one Box slot holds. `type` is the normalized material type.
+struct SlotState
+{
+    bool        has_filament = false;
+    std::string type;
+};
+
+// What the printer reported at send time. `slots` is indexed by slot.
 struct BoxState
 {
-    int  box_count          = 0;
-    bool box_temp_supported = false;
+    int                    box_count          = 0;
+    bool                   box_temp_supported = false;
+    std::vector<SlotState> slots;
 };
 
 // A reason to refuse a send. `filament` is 0-based; `slot` is the slot the G-code or the dialog names, -1 when none.
+// `filament_type` and `slot_type` are set for TypeMismatch.
 struct Problem
 {
-    enum class Kind { MapDisagrees, SlotBeyondBoxes, TempBeyondBoxes, CommandsMissing };
+    enum class Kind { MapDisagrees, SlotBeyondBoxes, SlotEmpty, TypeMismatch, TempBeyondBoxes, CommandsMissing };
 
-    Kind kind;
-    int  filament = -1;
-    int  slot     = -1;
+    Kind        kind;
+    int         filament = -1;
+    int         slot     = -1;
+    std::string filament_type;
+    std::string slot_type;
 };
 
 // Reads the print dialog's mapping, one Box slot per filament, -1 where a filament has none. Returns false when `ams_mapping`
@@ -60,6 +71,8 @@ std::optional<Problem> find_map_conflict(const Blocks& blocks, const std::vector
 
 // Finds the first problem the printer's live state raises. The dialog maps an unused filament to -1 just as it does an
 // external spool, so used filaments are those with a type in `filament_types`; no `filament_types` means every filament is used.
+// `filament_types` must be normalized like the slot types. A slot missing from `state.slots` is not checked, and no
+// `filament_types` leaves the types unchecked.
 std::optional<Problem> find_state_problem(const Blocks&                   blocks,
                                           const std::vector<int>&         mapping,
                                           const std::vector<std::string>& filament_types,

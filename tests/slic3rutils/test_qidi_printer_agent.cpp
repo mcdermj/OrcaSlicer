@@ -244,3 +244,77 @@ TEST_CASE("A failed printer query lets the G-code upload as sliced", "[QidiPrint
     CHECK(agent.check_upload(params_with("[0, 1]"), gcode.string(), error));
     CHECK(agent.queries == 1);
 }
+
+TEST_CASE("Sending to an empty Box slot is refused naming the filament and slot", "[QidiPrinterAgent]")
+{
+    ScopedTemporaryDir dir("qidi-check");
+    const auto         gcode = dir.path() / "Cube.gcode";
+    write_text(gcode, identity_map_gcode);
+
+    CannedQidiAgent agent;
+    agent.state.slots = {{true, "PLA"}, {false, ""}};
+    std::string error;
+    CHECK_FALSE(agent.check_upload(params_with("[0, 1]"), gcode.string(), error));
+    CHECK(error.find("slot 2") != std::string::npos);
+    CHECK(error.find("filament 2") != std::string::npos);
+}
+
+TEST_CASE("A slot holding another material than the filament is refused", "[QidiPrinterAgent]")
+{
+    ScopedTemporaryDir dir("qidi-check");
+    const auto         gcode = dir.path() / "Cube.gcode";
+    write_text(gcode, identity_map_gcode);
+
+    CannedQidiAgent agent;
+    agent.state.slots       = {{true, "PLA"}, {true, "PLA"}};
+    PrintParams params      = params_with("[0, 1]");
+    params.ams_mapping_info = R"([{"filamentType": "PLA"}, {"filamentType": "PETG"}])";
+
+    std::string error;
+    CHECK_FALSE(agent.check_upload(params, gcode.string(), error));
+    CHECK(error.find("slot 2") != std::string::npos);
+    CHECK(error.find("PETG") != std::string::npos);
+}
+
+TEST_CASE("A filament subtype of the slot's material is sent", "[QidiPrinterAgent]")
+{
+    ScopedTemporaryDir dir("qidi-check");
+    const auto         gcode = dir.path() / "Cube.gcode";
+    write_text(gcode, identity_map_gcode);
+
+    CannedQidiAgent agent;
+    agent.state.slots       = {{true, "PLA"}, {true, "PLA"}};
+    PrintParams params      = params_with("[0, 1]");
+    params.ams_mapping_info = R"([{"filamentType": "PLA"}, {"filamentType": "PLA Silk"}])";
+    std::string error;
+    CHECK(agent.check_upload(params, gcode.string(), error));
+}
+
+TEST_CASE("An empty or mismatched slot is not checked for G-code without the Box blocks", "[QidiPrinterAgent]")
+{
+    ScopedTemporaryDir dir("qidi-check");
+    const auto         gcode = dir.path() / "Cube.gcode";
+    write_text(gcode, "; header\nG28\n");
+
+    CannedQidiAgent agent;
+    agent.state.slots       = {{false, ""}};
+    PrintParams params      = params_with("[0]");
+    params.ams_mapping_info = R"([{"filamentType": "PETG"}])";
+    std::string error;
+    CHECK(agent.check_upload(params, gcode.string(), error));
+    CHECK(agent.queries == 0);
+}
+
+TEST_CASE("An unused filament is not checked against the Box slots", "[QidiPrinterAgent]")
+{
+    ScopedTemporaryDir dir("qidi-check");
+    const auto         gcode = dir.path() / "Cube.gcode";
+    write_text(gcode, identity_map_gcode);
+
+    CannedQidiAgent agent;
+    agent.state.slots       = {{true, "PLA"}, {false, ""}};
+    PrintParams params      = params_with("[0, 1]");
+    params.ams_mapping_info = R"([{"filamentType": "PLA"}, {"filamentType": ""}])";
+    std::string error;
+    CHECK(agent.check_upload(params, gcode.string(), error));
+}

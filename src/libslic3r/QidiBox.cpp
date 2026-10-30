@@ -161,8 +161,18 @@ std::optional<Problem> find_state_problem(const Blocks&                   blocks
     const int slot_limit = state.box_count * 4;
     for (size_t filament = 0; filament < mapping.size(); ++filament) {
         const bool used = filament_types.empty() || (filament < filament_types.size() && !filament_types[filament].empty());
-        if (used && mapping[filament] >= slot_limit)
-            return Problem{Problem::Kind::SlotBeyondBoxes, static_cast<int>(filament), mapping[filament]};
+        if (!used || mapping[filament] < 0)
+            continue;
+        const int slot = mapping[filament];
+        if (slot >= slot_limit)
+            return Problem{Problem::Kind::SlotBeyondBoxes, static_cast<int>(filament), slot};
+        if (static_cast<size_t>(slot) >= state.slots.size())
+            continue;
+        const SlotState& held = state.slots[slot];
+        if (!held.has_filament)
+            return Problem{Problem::Kind::SlotEmpty, static_cast<int>(filament), slot};
+        if (filament < filament_types.size() && filament_types[filament] != held.type)
+            return Problem{Problem::Kind::TypeMismatch, static_cast<int>(filament), slot, filament_types[filament], held.type};
     }
     if (blocks.has_temp) {
         for (const int filament : blocks.temp_filaments)
