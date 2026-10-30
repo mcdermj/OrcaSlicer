@@ -4,6 +4,7 @@
 #include "IPrinterAgent.hpp"
 #include "MoonrakerPrinterAgent.hpp"
 #include "bambu_networking.hpp"
+#include "libslic3r/QidiBox.hpp"
 
 #include <map>
 #include <string>
@@ -13,7 +14,7 @@
 
 namespace Slic3r {
 
-class QidiPrinterAgent final : public MoonrakerPrinterAgent
+class QidiPrinterAgent : public MoonrakerPrinterAgent
 {
 public:
     explicit QidiPrinterAgent(std::string log_dir);
@@ -31,6 +32,11 @@ public:
     static nlohmann::json print_start_request(const PrintParams& params, const std::string& filename);
 
 protected:
+    // Refuses a send whose QIDI_BOX blocks disagree with the print dialog's slots or with the printer's Boxes and commands.
+    // G-code without the blocks passes, and so does any send the printer cannot be queried for.
+    bool check_upload(const PrintParams& params, const std::string& gcode_path, std::string& error) override;
+    // Asks the printer how many Boxes it has and whether it knows the Box temperature commands
+    virtual bool query_box_state(QidiBox::BoxState& state, std::string& error);
     // Saves the Box slot picked for each filament in the print dialog, then starts the print through Moonraker
     bool print_uploaded_file(const PrintParams& params, const std::string& filename) override;
     std::string ams_unit_name(int ams_id) const override { return "Qidi Box " + std::to_string(ams_id + 1); }
@@ -49,8 +55,10 @@ private:
                          const std::string&        series_id,
                          std::vector<AmsTrayData>& trays,
                          int&                      box_count,
-                         std::string&              error);
-    bool fetch_filament_dict(const std::string& base_url, const std::string& api_key, QidiFilamentDict& dict, std::string& error) const;
+                         std::string&              error,
+                         long                      timeout_max = 10);
+    bool fetch_filament_dict(const std::string& base_url, const std::string& api_key, QidiFilamentDict& dict, std::string& error,
+                             long timeout_max = 10) const;
     std::string normalize_filament_type(const std::string& filament_type);
     std::string infer_series_id(const std::string& model_id, const std::string& dev_name);
     std::string normalize_model_key(std::string value);

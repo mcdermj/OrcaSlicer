@@ -5,7 +5,9 @@
 #include "bambu_networking.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/QidiBox.hpp"
+#include "libslic3r/format.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
+#include "slic3r/GUI/I18N.hpp"
 
 #include "nlohmann/json.hpp"
 #include <boost/algorithm/string.hpp>
@@ -13,9 +15,16 @@
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 #include <cctype>
+#include <cstddef>
 #include "libslic3r/Preset.hpp"
+#include <ios>
+#include <istream>
 #include <map>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -35,6 +44,50 @@ bool has_visible_base_preset(const PresetCollection& filaments, const std::strin
             return true;
     }
     return false;
+}
+
+// Reads the lines that can hold the QIDI_BOX blocks, which the exporter writes ahead of the start G-code.
+std::string read_block_region(std::istream& in)
+{
+    constexpr size_t max_region = 16 * 1024 * 1024;
+
+    std::string region;
+    std::string line;
+    while (region.size() < max_region && std::getline(in, line)) {
+        region += line;
+        if (!in.eof()) {
+            region += '\n';
+        }
+        if (line == "; QIDI_BOX_TEMP_END" || boost::starts_with(line, ";LAYER_CHANGE")) {
+            break;
+        }
+    }
+    return region;
+}
+
+// Box slots and filaments are shown from 1, as on the printer and in the print dialog
+std::string describe(const QidiBox::Problem& problem, int slot_limit)
+{
+    const int filament = problem.filament + 1;
+    const int slot     = problem.slot + 1;
+    switch (problem.kind) {
+    case QidiBox::Problem::Kind::MapDisagrees:
+        return format(_u8L("The G-code sets filament %1% to Box slot %2%, which would override the slot picked for it in the print dialog. "
+                           "Pick slot %2% for it in the dialog, or turn off box_slot_map_in_gcode and slice again."),
+                      filament, slot);
+    case QidiBox::Problem::Kind::SlotBeyondBoxes:
+        return format(_u8L("Filament %1% is mapped to Box slot %2%, beyond the printer's last Box slot (%3%). "
+                           "Pick other slots in the print dialog, or set box_slot_count to match the printer."),
+                      filament, slot, slot_limit);
+    case QidiBox::Problem::Kind::TempBeyondBoxes:
+        return format(_u8L("The G-code sets a Box temperature for filament %1%, beyond the printer's last Box slot (%2%). "
+                           "Set box_slot_count to match the printer and slice again."),
+                      filament, slot_limit);
+    case QidiBox::Problem::Kind::CommandsMissing:
+        break;
+    }
+    return _u8L("The printer firmware does not know the Box temperature commands BOX_TEMP_SET and DISABLE_BOX_HEATER. "
+                "Update the firmware, or turn off support_box_temp_control and slice again.");
 }
 
 } // anonymous namespace
@@ -121,6 +174,100 @@ std::string QidiPrinterAgent::build_tool_slot_script(const std::string& ams_mapp
     return script;
 }
 
+bool QidiPrinterAgent::check_upload(const PrintParams& params, const std::string& gcode_path, std::string& error)
+{
+    std::vector<int> mapping;
+    const bool       has_mapping = QidiBox::parse_slot_mapping(params.ams_mapping, mapping);
+
+    boost::filesystem::path source = gcode_path;
+    boost::filesystem::path extracted;
+    if (boost::iends_with(gcode_path, ".3mf")) {
+        extracted = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path("orca-qidi-%%%%-%%%%-%%%%.gcode");
+        source    = extracted;
+    }
+    std::string head;
+    if (extracted.empty() || extract_bundle_plate_gcode(gcode_path, params.plate_index, extracted)) {
+        boost::filesystem::ifstream in(source, std::ios::binary);
+        head = read_block_region(in);
+    }
+    if (!extracted.empty()) {
+        boost::system::error_code ec;
+        boost::filesystem::remove(extracted, ec);
+    }
+
+    const QidiBox::Blocks blocks = QidiBox::parse_blocks(head);
+    if (!blocks.has_map && !blocks.has_temp) {
+        return true;
+    }
+
+    // Without a dialog mapping the file's map block is the only one, so there is nothing for it to disagree with
+    if (const auto conflict = has_mapping ? QidiBox::find_map_conflict(blocks, mapping) : std::nullopt) {
+        error = describe(*conflict, 0);
+        return false;
+    }
+
+    QidiBox::BoxState state;
+    std::string       query_error;
+    if (!query_box_state(state, query_error)) {
+        BOOST_LOG_TRIVIAL(warning) << "QidiPrinterAgent::check_upload: Could not query the printer, uploading the G-code as sliced: "
+                                   << query_error;
+        return true;
+    }
+
+    std::vector<std::string> filament_types;
+    QidiBox::parse_filament_types(params.ams_mapping_info, filament_types);
+    if (const auto problem = QidiBox::find_state_problem(blocks, mapping, filament_types, state)) {
+        error = describe(*problem, state.box_count * 4);
+        return false;
+    }
+    return true;
+}
+
+bool QidiPrinterAgent::query_box_state(QidiBox::BoxState& state, std::string& error)
+{
+    constexpr long query_timeout = 5;
+
+    QidiFilamentDict dict;
+    if (!fetch_filament_dict(device_info.base_url, device_info.api_key, dict, error, query_timeout)) {
+        return false;
+    }
+
+    std::vector<AmsTrayData> trays;
+    try {
+        if (!fetch_slot_info(device_info.base_url, device_info.api_key, dict, infer_series_id(device_info.model_id, device_info.model_name),
+                             trays, state.box_count, error, query_timeout)) {
+            return false;
+        }
+    } catch (const nlohmann::json::exception& e) {
+        error = e.what();
+        return false;
+    }
+
+    std::string body;
+    std::string http_error;
+    auto        http = Http::get(join_url(device_info.base_url, "/printer/gcode/help"));
+    if (!device_info.api_key.empty()) {
+        http.header("X-Api-Key", device_info.api_key);
+    }
+    http.timeout_connect(query_timeout)
+        .timeout_max(query_timeout)
+        .on_complete([&](std::string response, unsigned status) {
+            if (status == 200) {
+                body = std::move(response);
+            } else {
+                http_error = "HTTP error: " + std::to_string(status);
+            }
+        })
+        .on_error([&](std::string, std::string err, unsigned) { http_error = std::move(err); })
+        .perform_sync();
+
+    if (!http_error.empty() || !QidiBox::parse_box_temp_support(body, state.box_temp_supported)) {
+        error = http_error.empty() ? "Unexpected gcode/help response" : http_error;
+        return false;
+    }
+    return true;
+}
+
 bool QidiPrinterAgent::print_uploaded_file(const PrintParams& params, const std::string& filename)
 {
     const std::string script = build_tool_slot_script(params.ams_mapping);
@@ -148,7 +295,8 @@ bool QidiPrinterAgent::fetch_slot_info(const std::string&        base_url,
                                        const std::string&        series_id,
                                        std::vector<AmsTrayData>& trays,
                                        int&                      box_count,
-                                       std::string&              error)
+                                       std::string&              error,
+                                       long                      timeout_max)
 {
     std::string url = join_url(base_url, "/printer/objects/query?save_variables=variables&multi_color_controller=box");
     for (int i = 0; i < 16; ++i) {
@@ -164,7 +312,7 @@ bool QidiPrinterAgent::fetch_slot_info(const std::string&        base_url,
         http.header("X-Api-Key", api_key);
     }
     http.timeout_connect(5)
-        .timeout_max(10)
+        .timeout_max(timeout_max)
         .on_complete([&](std::string body, unsigned status) {
             if (status == 200) {
                 response_body = body;
@@ -289,7 +437,8 @@ bool QidiPrinterAgent::fetch_slot_info(const std::string&        base_url,
 bool QidiPrinterAgent::fetch_filament_dict(const std::string& base_url,
                                            const std::string& api_key,
                                            QidiFilamentDict& dict,
-                                           std::string& error) const
+                                           std::string& error,
+                                           long timeout_max) const
 {
     std::string url = join_url(base_url, "/server/files/config/officiall_filas_list.cfg");
 
@@ -302,7 +451,7 @@ bool QidiPrinterAgent::fetch_filament_dict(const std::string& base_url,
         http.header("X-Api-Key", api_key);
     }
     http.timeout_connect(5)
-        .timeout_max(10)
+        .timeout_max(timeout_max)
         .on_complete([&](std::string body, unsigned status) {
             if (status == 200) {
                 response_body = body;
